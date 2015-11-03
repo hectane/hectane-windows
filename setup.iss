@@ -29,4 +29,12 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "hectane-386.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: not Is64BitInstallMode
 Source: "hectane-amd64.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: Is64BitInstallMode
 
-; TODO: register Windows service
+[Run]
+Filename: "{app}\{#AppExe}"; Parameters: "stop"; StatusMsg: "Stopping service..."; Flags: runhidden
+Filename: "{app}\{#AppExe}"; Parameters: "remove"; StatusMsg: "Removing service..."; Flags: runhidden
+Filename: "{app}\{#AppExe}"; Parameters: "-directory ""{app}\data"" install"; StatusMsg: "Installing service..."; Flags: runhidden
+Filename: "{app}\{#AppExe}"; Parameters: "start"; StatusMsg: "Starting service..."; Flags: runhidden
+
+[UninstallRun]
+Filename: "{app}\{#AppExe}"; Parameters: "stop"; StatusMsg: "Stopping service..."; Flags: runhidden
+Filename: "{app}\{#AppExe}"; Parameters: "remove"; StatusMsg: "Removing service..."; Flags: runhidden
