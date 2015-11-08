@@ -24,17 +24,48 @@ SolidCompression=yes
 WizardImageFile=image.bmp
 WizardSmallImageFile=image_small.bmp
 ArchitecturesInstallIn64BitMode=x64
+MinVersion=6.0
 
 [Files]
 Source: "hectane-386.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: not Is64BitInstallMode
 Source: "hectane-amd64.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: Is64BitInstallMode
 
-[Run]
-Filename: "{app}\{#AppExe}"; Parameters: "stop"; StatusMsg: "Stopping service..."; Flags: runhidden
-Filename: "{app}\{#AppExe}"; Parameters: "remove"; StatusMsg: "Removing service..."; Flags: runhidden
-Filename: "{app}\{#AppExe}"; Parameters: "-directory ""{app}\data"" install"; StatusMsg: "Installing service..."; Flags: runhidden
-Filename: "{app}\{#AppExe}"; Parameters: "start"; StatusMsg: "Starting service..."; Flags: runhidden
+[Code]
 
-[UninstallRun]
-Filename: "{app}\{#AppExe}"; Parameters: "stop"; StatusMsg: "Stopping service..."; Flags: runhidden
-Filename: "{app}\{#AppExe}"; Parameters: "remove"; StatusMsg: "Removing service..."; Flags: runhidden
+// It would be nice if we could use [Run] entries but the return code is not checked,
+// therefore we must run the service installation code ourselves and check for errors
+
+function ServiceCommand(Command: String): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec(ExpandConstant('{app}\{#AppExe}'), Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if not RmSessionStarted() then
+    begin
+      WizardForm.StatusLabel.Caption := 'Installing & starting service...';
+      if ServiceCommand(ExpandConstant('-directory "{app}\data" install')) then
+      begin
+        if not ServiceCommand('start') then
+          MsgBox('Unable to start service.', mbError, MB_OK);
+      end
+      else
+        MsgBox('Unable to install service.', mbError, MB_OK);
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    UninstallProgressForm.StatusLabel.Caption := 'Stopping & removing service...';
+    ServiceCommand('stop');
+    ServiceCommand('remove'); 
+  end;
+end;
