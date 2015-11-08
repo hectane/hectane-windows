@@ -27,8 +27,8 @@ ArchitecturesInstallIn64BitMode=x64
 MinVersion=6.0
 
 [Files]
-Source: "hectane-386.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: not Is64BitInstallMode
-Source: "hectane-amd64.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: Is64BitInstallMode
+Source: "hectane-386.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: not Is64BitInstallMode; BeforeInstall: PreInstall; AfterInstall: PostInstall
+Source: "hectane-amd64.exe"; DestDir: "{app}"; DestName: "{#AppExe}"; Check: Is64BitInstallMode; BeforeInstall: PreInstall; AfterInstall: PostInstall
 
 [Code]
 
@@ -42,21 +42,33 @@ begin
   Result := Exec(ExpandConstant('{app}\{#AppExe}'), Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+// The service should only be installed if the executable didn't exist before
+// installation. A global variable is required to keep track of this so that
+// after installation, the appropriate action can be taken.
+
+var 
+  FileExisted: Boolean;
+
+procedure PreInstall();
 begin
-  if CurStep = ssPostInstall then
+  FileExisted := FileExists(ExpandConstant('{app}\{#AppExe}'));
+end;
+
+// The service will automatically be stopped and restarted by the Restart
+// Manager if it was running prior to installation.
+
+procedure PostInstall();
+begin
+  if not FileExisted then
   begin
-    if not RmSessionStarted() then
+    WizardForm.StatusLabel.Caption := 'Installing & starting service...';
+    if ServiceCommand(ExpandConstant('-directory "{app}\data" install')) then
     begin
-      WizardForm.StatusLabel.Caption := 'Installing & starting service...';
-      if ServiceCommand(ExpandConstant('-directory "{app}\data" install')) then
-      begin
-        if not ServiceCommand('start') then
-          MsgBox('Unable to start service.', mbError, MB_OK);
-      end
-      else
-        MsgBox('Unable to install service.', mbError, MB_OK);
-    end;
+      if not ServiceCommand('start') then
+        MsgBox('Unable to start service.', mbError, MB_OK);
+    end
+    else
+      MsgBox('Unable to install service.', mbError, MB_OK);
   end;
 end;
 
